@@ -1,4 +1,10 @@
-use opengl_graphics::{GlGraphics, ImageSize, Texture};
+use crate::controller::Controller;
+use graphics::Context;
+use opengl_graphics::{
+    GlGraphics,
+    ImageSize,
+    Texture
+};
 use piston::{
     Size,
 };
@@ -8,8 +14,6 @@ use piston_window::{
 use sprite::Sprite;
 use std::path::Path;
 use std::rc::Rc;
-use graphics::Context;
-use crate::controller::Controller;
 
 pub struct Player {
     degrees: f64,
@@ -35,9 +39,17 @@ impl Player {
         }
     }
 
+    pub fn get_x(&mut self) -> f64 {
+        self.x
+    }
+
+    pub fn get_y(&mut self) -> f64 {
+        self.y
+    }
+
     pub fn update(&mut self, controller: Controller) {
         let left_stick_pos = controller.get_left_stick();
-        self.degrees = left_stick_pos.get_y().atan2(left_stick_pos.get_x()).to_degrees() + 90.0;
+        self.degrees = left_stick_pos.get_degrees() + 90.0;
         let prev_x = self.x;
         let prev_y = self.y;
         self.x = (prev_x + (left_stick_pos.get_x() * 1.0)).min(self.window_width).max(0.0);

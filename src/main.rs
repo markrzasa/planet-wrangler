@@ -1,5 +1,6 @@
 mod player;
 mod controller;
+mod laser;
 
 extern crate graphics;
 extern crate opengl_graphics;
@@ -7,6 +8,9 @@ extern crate piston;
 extern crate sdl2_window;
 extern crate sprite;
 
+use crate::controller::Controller;
+use crate::laser::Lasers;
+use crate::player::Player;
 use graphics::{clear, text, Transformed};
 use opengl_graphics::{
     GlGraphics,
@@ -22,8 +26,6 @@ use piston_window::{
     TextureSettings
 };
 use sdl2_window::Sdl2Window;
-use crate::controller::Controller;
-use crate::player::Player;
 
 const WINDOW_HEIGHT: f64 = 1000.0;
 const WINDOW_WIDTH: f64 = 1000.0;
@@ -42,9 +44,9 @@ fn main() {
 
     let mut glyphs = GlyphCache::new("./assets/PressStart2PRegular.ttf", (), TextureSettings::new()).unwrap();
 
-    let mut controller = Controller::new();
+    let mut controller = Controller::new(WINDOW_WIDTH, WINDOW_HEIGHT);
     let mut player = Player::new(WINDOW_WIDTH, WINDOW_HEIGHT, "./assets/hero.png");
-
+    let mut lasers = Lasers::new(WINDOW_WIDTH, WINDOW_HEIGHT, "./assets/laser.png");
     let mut game_state = GameState::Starting;
 
     let mut events = Events::new(EventSettings::new());
@@ -59,17 +61,17 @@ fn main() {
             }
         }
 
+        println!("==============================");
+        println!("  left:  {}, {}", controller.get_left_stick().get_x(), controller.get_left_stick().get_y());
+        println!("  right: {}, {}", controller.get_right_stick().get_x(), controller.get_right_stick().get_y());
+        println!("==============================");
+
         player.update(controller);
+        lasers.update(controller, &player.get_x(), &player.get_y());
 
         if let Some(args) = event.render_args() {
             gl.draw(args.viewport(), |ctx, gl| {
                 clear(color::GRAY, gl);
-
-                let transform = ctx.transform.trans(10.0, 20.0);
-                text::Text::new_color(color::YELLOW, 10).draw(
-                    &format!("{:.3}, {:.3}", controller.get_left_stick().get_x(), controller.get_left_stick().get_y()),
-                    &mut glyphs, &ctx.draw_state, transform, gl
-                ).unwrap();
 
                 match game_state {
                     GameState::Starting => {
@@ -81,6 +83,7 @@ fn main() {
                     }
                     _ => {
                         player.draw(ctx, gl);
+                        lasers.draw(ctx, gl);
                     }
                 }
             });

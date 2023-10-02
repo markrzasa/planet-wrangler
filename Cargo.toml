@@ -12,3 +12,11 @@ piston2d-graphics = "0.43.0"
 piston2d-opengl_graphics = "0.82.0"
 piston2d-sprite = "0.67.0"
 pistoncore-sdl2_window = "0.68.0"
+
+[dependencies.uuid]
+version = "1.4.1"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
