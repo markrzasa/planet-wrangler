@@ -3,10 +3,12 @@ mod controller;
 mod laser;
 
 extern crate graphics;
+extern crate image;
 extern crate opengl_graphics;
 extern crate piston;
 extern crate sdl2_window;
 extern crate sprite;
+extern crate rust_embed;
 
 use crate::controller::Controller;
 use crate::laser::Lasers;
@@ -25,6 +27,7 @@ use piston_window::{
     color,
     TextureSettings
 };
+use rust_embed::RustEmbed;
 use sdl2_window::Sdl2Window;
 
 const WINDOW_HEIGHT: f64 = 1000.0;
@@ -35,6 +38,10 @@ enum GameState {
     Running,
 }
 
+#[derive(RustEmbed)]
+#[folder = "assets/"]
+struct Assets;
+
 fn main() {
     let opengl = OpenGL::V3_2;
     let mut window: Sdl2Window = WindowSettings::new("Planet Wrangler", [WINDOW_WIDTH, WINDOW_WIDTH])
@@ -42,11 +49,15 @@ fn main() {
 
     let mut gl = GlGraphics::new(OpenGL::V3_2);
 
-    let mut glyphs = GlyphCache::new("./assets/PressStart2PRegular.ttf", (), TextureSettings::new()).unwrap();
-
     let mut controller = Controller::new(WINDOW_WIDTH, WINDOW_HEIGHT);
-    let mut player = Player::new(WINDOW_WIDTH, WINDOW_HEIGHT, "./assets/hero.png");
-    let mut lasers = Lasers::new(WINDOW_WIDTH, WINDOW_HEIGHT, "./assets/laser.png");
+
+    let font = Assets::get("PressStart2PRegular.ttf").unwrap();
+    let mut glyphs = GlyphCache::from_bytes(font.data.as_ref(), (), TextureSettings::new()).unwrap();
+
+    let hero_png = Assets::get("hero.png").unwrap();
+    let mut player = Player::new(WINDOW_WIDTH, WINDOW_HEIGHT, &hero_png);
+    let laser_png = Assets::get("laser.png").unwrap();
+    let mut lasers = Lasers::new(WINDOW_WIDTH, WINDOW_HEIGHT, &laser_png);
     let mut game_state = GameState::Starting;
 
     let mut events = Events::new(EventSettings::new());
@@ -60,11 +71,6 @@ fn main() {
                 _ => {},
             }
         }
-
-        println!("==============================");
-        println!("  left:  {}, {}", controller.get_left_stick().get_x(), controller.get_left_stick().get_y());
-        println!("  right: {}, {}", controller.get_right_stick().get_x(), controller.get_right_stick().get_y());
-        println!("==============================");
 
         player.update(controller);
         lasers.update(controller, &player.get_x(), &player.get_y());

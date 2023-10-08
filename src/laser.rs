@@ -6,8 +6,8 @@ use piston_window::{
 };
 use sprite::Sprite;
 use std::collections::HashMap;
-use std::path::Path;
 use std::rc::Rc;
+use rust_embed::EmbeddedFile;
 use uuid::Uuid;
 
 struct Laser {
@@ -18,20 +18,22 @@ struct Laser {
     m: f64,
     b: f64,
     x_increment: f64,
-    y_increment: f64
+    y_increment: f64,
+    vertical: bool
 }
 
 impl Laser {
-    pub fn new(degrees: f64, x1: f64, y1: f64, x2: f64, y2: f64, window_width: f64, window_height: f64) -> Self {
+    pub fn new(degrees: f64, x1: f64, y1: f64, x2: f64, y2: f64) -> Self {
+
         let m = (y2 - y1) / (x2 - x1);
-        let mut x_increment = -1.0 * (x1 / 50.0);
+        let mut x_increment = -1.0;
         if x1 < x2 {
-            x_increment = (window_width - x1) / 50.0;
+            x_increment = 1.0;
         }
 
-        let mut y_increment = -1.0 * (y1 / 50.0);
+        let mut y_increment = -1.0;
         if y1 < y2 {
-            y_increment = (window_height - y1) / 50.0;
+            y_increment = 1.0;
         }
 
         Self {
@@ -42,7 +44,8 @@ impl Laser {
             m,
             b: y1 - (m * x1),
             x_increment,
-            y_increment
+            y_increment,
+            vertical: (x2 - x1).abs() < (y2 - y1).abs()
         }
     }
 
@@ -51,19 +54,12 @@ impl Laser {
     }
 
     pub fn update(&mut self) {
-        let prev_x = self.x;
-        let prev_y = self.y;
-        let x_inc_x = self.x + self.x_increment;
-        let x_inc_y = (self.m * (self.x + self.x_increment)) + self.b;
-        let y_inc_y = self.y + self.y_increment;
-        let y_inc_x = (self.y - self.b) / self.m;
-
-        if (x_inc_x - prev_x).abs() > (y_inc_y - prev_y).abs() {
-            self.x = x_inc_x;
-            self.y = x_inc_y;
+        if self.vertical {
+            self.y = self.y + self.y_increment;
+            self.x = (self.y - self.b) / self.m;
         } else {
-            self.x = y_inc_x;
-            self.y = y_inc_y;
+            self.x = self.x + self.x_increment;
+            self.y = (self.m * self.x) + self.b;
         }
     }
 
@@ -88,8 +84,9 @@ pub struct Lasers {
 }
 
 impl Lasers {
-    pub fn new(window_width: f64, window_height: f64, sprite_path: &str) -> Self {
-        let texture = Texture::from_path(Path::new(sprite_path), &TextureSettings::new()).unwrap();
+    pub fn new(window_width: f64, window_height: f64, sprite_file: &EmbeddedFile) -> Self {
+        let image = image::load_from_memory(sprite_file.data.as_ref()).unwrap();
+        let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
         Self {
             sprite: Sprite::from_texture(Rc::new(texture)),
             lasers: HashMap::new(),
@@ -101,14 +98,11 @@ impl Lasers {
     pub fn update(&mut self, controller: Controller, player_x: &f64, player_y: &f64) {
         let right_stick_pos = controller.get_right_stick();
         if right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0 {
-            if self.lasers.is_empty() {
-                let laser = Laser::new(
-                    right_stick_pos.get_degrees(), *player_x, *player_y,
-                    right_stick_pos.get_screen_x(), right_stick_pos.get_screen_y(),
-                    self.window_width, self.window_height
-                );
-                self.lasers.insert(laser.id, laser);
-            }
+            let laser = Laser::new(
+                right_stick_pos.get_degrees(), *player_x, *player_y,
+                right_stick_pos.get_screen_x(), right_stick_pos.get_screen_y()
+            );
+            self.lasers.insert(laser.id, laser);
         }
 
         let mut to_remove = vec!();

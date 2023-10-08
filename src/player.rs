@@ -12,8 +12,8 @@ use piston_window::{
     TextureSettings
 };
 use sprite::Sprite;
-use std::path::Path;
 use std::rc::Rc;
+use rust_embed::EmbeddedFile;
 
 pub struct Player {
     degrees: f64,
@@ -25,8 +25,9 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(window_width: f64, window_height: f64, sprite_path: &str) -> Self {
-        let texture = Texture::from_path(Path::new(sprite_path), &TextureSettings::new()).unwrap();
+    pub fn new(window_width: f64, window_height: f64, sprite_file: &EmbeddedFile) -> Self {
+        let image = image::load_from_memory(sprite_file.data.as_ref()).unwrap();
+        let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
         let size = texture.get_size();
         let half_size = Size::from([size.0 / 2, size.1 / 2]);
         Self {
