@@ -1,4 +1,3 @@
-use crate::controller::Controller;
 use graphics::Context;
 use opengl_graphics::{
     GlGraphics,
@@ -14,6 +13,7 @@ use piston_window::{
 use sprite::Sprite;
 use std::rc::Rc;
 use rust_embed::EmbeddedFile;
+use crate::game::GameContext;
 
 pub struct Player {
     degrees: f64,
@@ -48,13 +48,15 @@ impl Player {
         self.y
     }
 
-    pub fn update(&mut self, controller: Controller) {
-        let left_stick_pos = controller.get_left_stick();
+    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+        let left_stick_pos = context.get_controller().get_left_stick();
         self.degrees = left_stick_pos.get_degrees() + 90.0;
         let prev_x = self.x;
         let prev_y = self.y;
         self.x = (prev_x + (left_stick_pos.get_x() * 1.0)).min(self.window_width).max(0.0);
         self.y = (prev_y + (left_stick_pos.get_y() * 1.0)).min(self.window_height).max(0.0);
+
+        context
     }
 
     pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
