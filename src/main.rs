@@ -18,9 +18,7 @@ use piston::{Events, EventSettings, RenderEvent};
 use piston::window::{
     WindowSettings,
 };
-use piston_window::{
-    color,
-};
+use piston_window::{color, Window};
 use rust_embed::RustEmbed;
 use sdl2_window::Sdl2Window;
 use crate::game::Game;
@@ -35,8 +33,12 @@ struct Assets;
 
 fn main() {
     let opengl = OpenGL::V3_2;
-    let mut window: Sdl2Window = WindowSettings::new("Planet Wrangler", [WINDOW_WIDTH, WINDOW_WIDTH])
-        .exit_on_esc(true).graphics_api(opengl).build().unwrap();
+    let mut window: Sdl2Window = WindowSettings::new("Planet Wrangler", [WINDOW_WIDTH, WINDOW_HEIGHT])
+        .exit_on_esc(true)
+        .graphics_api(opengl)
+        .fullscreen(true)
+        .build()
+        .unwrap();
 
     let mut gl = GlGraphics::new(OpenGL::V3_2);
 
@@ -46,7 +48,7 @@ fn main() {
     let mut laser_png = Assets::get("laser.png").unwrap();
 
     let mut game = Game::new(
-        WINDOW_WIDTH, WINDOW_HEIGHT,
+        window.size().width, window.size().height,
         &mut font, &mut hero_png, &mut laser_png, &mut enemy_png
     );
 

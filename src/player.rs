@@ -13,13 +13,18 @@ use piston_window::{
 use sprite::Sprite;
 use std::rc::Rc;
 use rust_embed::EmbeddedFile;
+use sdl2::rect::Rect;
 use crate::game::GameContext;
 
 pub struct Player {
     degrees: f64,
     pub sprite: Sprite<Texture>,
+    start_x: f64,
+    start_y: f64,
     x: f64,
     y: f64,
+    width: f64,
+    height: f64,
     window_width: f64,
     window_height: f64,
 }
@@ -30,11 +35,17 @@ impl Player {
         let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
         let size = texture.get_size();
         let half_size = Size::from([size.0 / 2, size.1 / 2]);
+        let start_x = (window_width / 2.0) - half_size.width;
+        let start_y = (window_height / 2.0) - half_size.height;
         Self {
             degrees: 0.0,
             sprite: Sprite::from_texture(Rc::new(texture)),
+            start_x,
+            start_y,
             x: (window_width / 2.0) - half_size.width,
             y: (window_height / 2.0) - half_size.height,
+            width: size.0 as f64,
+            height: size.1 as f64,
             window_width,
             window_height
         }
@@ -46,6 +57,18 @@ impl Player {
 
     pub fn get_y(&mut self) -> f64 {
         self.y
+    }
+
+    pub fn get_width(&mut self) -> f64 {
+        self.width
+    }
+
+    pub fn get_height(&mut self) -> f64 {
+        self.height
+    }
+
+    pub fn get_rect(&self) -> Rect {
+        Rect::new(self.x as i32, self.y as i32, self.width as u32, self.height as u32)
     }
 
     pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
@@ -63,5 +86,10 @@ impl Player {
         self.sprite.set_position(self.x, self.y);
         self.sprite.set_rotation(self.degrees);
         self.sprite.draw(ctx.transform, gl);
+    }
+
+    pub fn reset(&mut self) {
+        self.x = self.start_x;
+        self.y = self.start_y;
     }
 }

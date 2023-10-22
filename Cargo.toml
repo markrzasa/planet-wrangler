@@ -15,6 +15,7 @@ piston2d-sprite = "0.67.0"
 pistoncore-sdl2_window = "0.68.0"
 rust-embed = "8.0.0"
 rand = "0.4.6"
+sdl2 = "0.35.2"
 
 [dependencies.uuid]
 version = "1.4.1"
