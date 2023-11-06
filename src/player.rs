@@ -14,13 +14,22 @@ use sprite::Sprite;
 use std::rc::Rc;
 use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
-use crate::game::GameContext;
+use crate::drawable::Drawable;
+use crate::game_context::GameContext;
+use crate::updateable::Updateable;
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum PlayerState {
+    NotTowing,
+    Towing
+}
 
 pub struct Player {
     degrees: f64,
-    pub sprite: Sprite<Texture>,
+    sprite: Sprite<Texture>,
     start_x: f64,
     start_y: f64,
+    state: PlayerState,
     x: f64,
     y: f64,
     width: f64,
@@ -42,6 +51,7 @@ impl Player {
             sprite: Sprite::from_texture(Rc::new(texture)),
             start_x,
             start_y,
+            state: PlayerState::NotTowing,
             x: (window_width / 2.0) - half_size.width,
             y: (window_height / 2.0) - half_size.height,
             width: size.0 as f64,
@@ -49,6 +59,10 @@ impl Player {
             window_width,
             window_height
         }
+    }
+
+    pub fn get_state(&mut self) -> PlayerState {
+        self.state
     }
 
     pub fn get_x(&mut self) -> f64 {
@@ -71,7 +85,25 @@ impl Player {
         Rect::new(self.x as i32, self.y as i32, self.width as u32, self.height as u32)
     }
 
-    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn not_towing(&mut self) {
+        self.state = PlayerState::NotTowing;
+    }
+
+    pub fn towing(&mut self) {
+        self.state = PlayerState::Towing;
+    }
+}
+
+impl Drawable for Player {
+    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+        self.sprite.set_position(self.x, self.y);
+        self.sprite.set_rotation(self.degrees);
+        self.sprite.draw(ctx.transform, gl);
+    }
+}
+
+impl Updateable for Player {
+    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         let left_stick_pos = context.get_controller().get_left_stick();
         self.degrees = left_stick_pos.get_degrees() + 90.0;
         let prev_x = self.x;
@@ -82,14 +114,9 @@ impl Player {
         context
     }
 
-    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
-        self.sprite.set_position(self.x, self.y);
-        self.sprite.set_rotation(self.degrees);
-        self.sprite.draw(ctx.transform, gl);
-    }
-
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.x = self.start_x;
         self.y = self.start_y;
+        self.state = PlayerState::NotTowing;
     }
 }

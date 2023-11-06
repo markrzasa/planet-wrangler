@@ -9,11 +9,22 @@ use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
 use sprite::Sprite;
 use uuid::Uuid;
-use crate::game::GameContext;
+use crate::drawable::Drawable;
+use crate::game_context::GameContext;
+use crate::updateable::Updateable;
 
 const ENEMY_MOVE_INCREMENT: f64 = 0.25;
+const ENEMY_DIE_INCREMENT: u32 = 1;
 const FRAME_DURATION_MILLIS: Duration = Duration::from_millis(100);
 const MAX_ENEMIES: usize = 75;
+const WAIT_TO_SPAWN_DURATION: Duration = Duration::from_millis(2000);
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum EnemyState {
+    Alive,
+    Dying,
+    Dead
+}
 
 pub struct Enemy {
     id: Uuid,
@@ -22,6 +33,7 @@ pub struct Enemy {
     height: u32,
     width: u32,
     sprite_index: u32,
+    state: EnemyState,
     frames: u32,
     last_frame_change: SystemTime
 }
@@ -35,9 +47,14 @@ impl Enemy {
             height,
             width,
             sprite_index: 0,
+            state: EnemyState::Alive,
             frames,
             last_frame_change: SystemTime::now()
         }
+    }
+
+    pub fn dying(&mut self) {
+        self.state = EnemyState::Dying;
     }
 
     pub fn get_id(&self) -> Uuid {
@@ -52,114 +69,164 @@ impl Enemy {
         self.sprite_index
     }
 
-    fn update(&mut self, player_x: f64, player_y: f64) {
-        if self.last_frame_change.elapsed().unwrap() >= FRAME_DURATION_MILLIS {
-            self.sprite_index = (self.sprite_index + 1).rem_euclid(self.frames);
-        }
-        if player_x < self.x {
-            self.x = self.x - ENEMY_MOVE_INCREMENT;
-        } else {
-            self.x = self.x + ENEMY_MOVE_INCREMENT;
-        }
+    pub fn get_state(&self) -> EnemyState {
+        self.state
+    }
 
-        if player_y < self.y {
-            self.y = self.y - ENEMY_MOVE_INCREMENT;
-        } else {
-            self.y = self.y + ENEMY_MOVE_INCREMENT;
+    fn update(&mut self, player: Rect, screen_height: f64, screen_width: f64) {
+        match self.state {
+            EnemyState::Alive => {
+                if self.last_frame_change.elapsed().unwrap() >= FRAME_DURATION_MILLIS {
+                    self.sprite_index = (self.sprite_index + 1).rem_euclid(self.frames);
+                    self.last_frame_change = SystemTime::now();
+                }
+                if (player.x as f64) < self.x {
+                    self.x = self.x - ENEMY_MOVE_INCREMENT;
+                } else {
+                    self.x = self.x + ENEMY_MOVE_INCREMENT;
+                }
+
+                if (player.y as f64) < self.y {
+                    self.y = self.y - ENEMY_MOVE_INCREMENT;
+                } else {
+                    self.y = self.y + ENEMY_MOVE_INCREMENT;
+                }
+            }
+            EnemyState::Dying => {
+                self.x = self.x - ENEMY_DIE_INCREMENT as f64;
+                self.y = self.y - ENEMY_DIE_INCREMENT as f64;
+                self.width = self.width + (ENEMY_DIE_INCREMENT * 2);
+                self.height = self.height + (ENEMY_DIE_INCREMENT * 2);
+                if (self.x <= 0.0) && (self.y <= 0.0) && ((self.x + self.width as f64) >= screen_width) && ((self.y + self.height as f64) >= screen_height) {
+                    self.state = EnemyState::Dead;
+                }
+            }
+            EnemyState::Dead => {}
         }
     }
 }
 
+enum EnemiesState {
+    Running,
+    WaitingToSpawn,
+    WaitingForSpawnPoints
+}
+
 pub struct Enemies {
-    sprite: Sprite<Texture>,
     enemies: HashMap<Uuid, Enemy>,
+    last_enemy: SystemTime,
+    sprite: Sprite<Texture>,
     sprite_height: u32,
     sprite_width: u32,
     sprite_frames: u32,
-    last_enemy: SystemTime,
-    window_width: f64,
-    window_height: f64,
+    state: EnemiesState,
+    wait_start: SystemTime
 }
 
 impl Enemies {
-    pub fn new(window_width: f64, window_height: f64, sprite_file: &EmbeddedFile, sprite_frames: u32) -> Self {
+    pub fn new(sprite_file: &EmbeddedFile, sprite_frames: u32) -> Self {
         let image = image::load_from_memory(sprite_file.data.as_ref()).unwrap();
         let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
         let sprite_height = texture.get_height();
         let sprite_width = texture.get_width() / sprite_frames;
         Self {
-            sprite: Sprite::from_texture(Rc::new(texture)),
-            sprite_height,
-            sprite_width,
-            sprite_frames,
             enemies: HashMap::new(),
             last_enemy: SystemTime::now(),
-            window_width,
-            window_height
+            sprite: Sprite::from_texture(Rc::new(texture)),
+            sprite_frames,
+            sprite_height,
+            sprite_width,
+            state: EnemiesState::WaitingForSpawnPoints,
+            wait_start: SystemTime::now()
         }
     }
 
-    pub fn get_enemies(&mut self) -> &HashMap<Uuid, Enemy> {
-        &self.enemies
+    pub fn get_enemies(&mut self) -> &mut HashMap<Uuid, Enemy> {
+        &mut self.enemies
     }
 
     pub fn remove(&mut self, id: &Uuid) {
         self.enemies.remove(id);
     }
+}
 
-    fn enemy_rect(&self) -> Rect {
-        let mut rng = rand::thread_rng();
-        let x = rng.gen_range(0, self.window_width as u32);
-        let y = rng.gen_range(0, self.window_height as u32);
+impl Drawable for Enemies {
+    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+        for enemy in self.enemies.values() {
+            match enemy.get_state() {
+                EnemyState::Alive => {
+                    self.sprite.set_src_rect([
+                        self.sprite_width as f64 * enemy.get_sprite_index() as f64,
+                        0.0,
+                        self.sprite_width as f64,
+                        self.sprite_height as f64
+                    ]);
+                    self.sprite.set_position(enemy.x, enemy.y);
+                    self.sprite.draw(ctx.transform, gl);
+                }
+                EnemyState::Dying => {
+                    let width = self.sprite_width as f64 / 2.0;
+                    let height = self.sprite_height as f64 / 2.0;
+                    self.sprite.set_src_rect([0.0, 0.0, width, height]);
+                    self.sprite.set_position(enemy.x, enemy.y);
+                    self.sprite.draw(ctx.transform, gl);
 
-        Rect::new(x as i32, y as i32, x + self.sprite_width, y + self.sprite_height)
-    }
+                    self.sprite.set_src_rect([width, 0.0, width, height]);
+                    self.sprite.set_position(enemy.x + enemy.width as f64 - width, enemy.y);
+                    self.sprite.draw(ctx.transform, gl);
 
-    fn get_spawn_coordinates(&self, no_spawn_rect: &Rect) -> (f64, f64) {
-        let mut enemy_rect = self.enemy_rect();
-        while enemy_rect.has_intersection(*no_spawn_rect) {
-            enemy_rect = self.enemy_rect();
+                    self.sprite.set_src_rect([0.0, height, width, height]);
+                    self.sprite.set_position(enemy.x + enemy.width as f64 - width, enemy.y + enemy.height as f64 - height);
+                    self.sprite.draw(ctx.transform, gl);
+
+                    self.sprite.set_src_rect([width, height, width, height]);
+                    self.sprite.set_position(enemy.x, enemy.y + enemy.height as f64 - height);
+                    self.sprite.draw(ctx.transform, gl);
+                }
+                _ => {}
+            }
         }
-
-        (enemy_rect.x as f64, enemy_rect.y as f64)
     }
+}
 
-    pub fn update<'s>(&mut self, context: &'s GameContext) -> &'s GameContext {
-        for enemy in self.enemies.values_mut() {
-            enemy.update(context.get_player_x(), context.get_player_y());
-        }
+impl Updateable for Enemies {
+    fn update<'s>(&mut self, context: &'s GameContext) -> &'s GameContext {
+        match self.state {
+            EnemiesState::Running => {
+                for (_, e) in self.enemies.iter_mut() {
+                    e.update(context.get_player(), context.get_screen_height(), context.get_screen_width());
+                }
 
-        if self.last_enemy.elapsed().unwrap().as_millis() > 500 && self.enemies.len() < MAX_ENEMIES {
-            let x = (context.get_player_x() - context.get_player_width()) as i32;
-            let y = (context.get_player_y() - context.get_player_height()) as i32;
-            let w = (context.get_player_x() + context.get_player_width()) as u32;
-            let h = (context.get_player_y() + context.get_player_height()) as u32;
-            let no_spawn_rect = Rect::new(x, y, w, h);
-            let spawn_coords = self.get_spawn_coordinates(&no_spawn_rect);
-            let enemy = Enemy::new(
-                spawn_coords.0, spawn_coords.1, self.sprite_width, self.sprite_height, self.sprite_frames
-            );
-            self.enemies.insert(enemy.get_id(), enemy);
-            self.last_enemy = SystemTime::now();
+                if self.last_enemy.elapsed().unwrap().as_millis() > 500 && self.enemies.len() < MAX_ENEMIES {
+                    let spawn_points = context.get_spawn_points();
+                    let i = rand::thread_rng().gen_range(0, spawn_points.len());
+                    let p = spawn_points.get(i).unwrap();
+                    let enemy = Enemy::new(
+                        p.x as f64, p.y as f64,
+                        self.sprite_width, self.sprite_height, self.sprite_frames
+                    );
+                    self.enemies.insert(enemy.get_id(), enemy);
+                    self.last_enemy = SystemTime::now();
+                }
+            }
+            EnemiesState::WaitingToSpawn => {
+                if self.wait_start.elapsed().unwrap() > WAIT_TO_SPAWN_DURATION {
+                    self.state = EnemiesState::Running;
+                }
+            }
+            EnemiesState::WaitingForSpawnPoints => {
+                if !context.get_spawn_points().is_empty() {
+                    self.state = EnemiesState::WaitingToSpawn;
+                    self.wait_start = SystemTime::now();
+                }
+            }
         }
 
         context
     }
 
-    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
-        for enemy in self.enemies.values() {
-            self.sprite.set_src_rect([
-                self.sprite_width as f64 * enemy.get_sprite_index() as f64,
-                0.0,
-                self.sprite_width as f64,
-                self.sprite_height as f64
-            ]);
-            self.sprite.set_position(enemy.x, enemy.y);
-            self.sprite.draw(ctx.transform, gl);
-        }
-    }
-
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.enemies.clear();
+        self.state = EnemiesState::WaitingForSpawnPoints;
     }
 }

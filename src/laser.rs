@@ -8,7 +8,9 @@ use std::time::SystemTime;
 use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
 use uuid::Uuid;
-use crate::game::GameContext;
+use crate::drawable::Drawable;
+use crate::game_context::GameContext;
+use crate::updateable::Updateable;
 
 pub struct Laser {
     id: Uuid,
@@ -63,7 +65,9 @@ impl Laser {
     pub fn update(&mut self) {
         if self.vertical {
             self.y = self.y + self.y_increment;
-            self.x = (self.y - self.b) / self.m;
+            if self.m.abs() != f64::INFINITY {
+                self.x = (self.y - self.b) / self.m;
+            }
         } else {
             self.x = self.x + self.x_increment;
             self.y = (self.m * self.x) + self.b;
@@ -117,15 +121,29 @@ impl Lasers {
     pub fn remove(&mut self, id: &Uuid) {
         self.lasers.remove(id);
     }
+}
 
-    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+impl Drawable for Lasers {
+    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+        for laser in self.lasers.values() {
+            self.sprite.set_position(laser.x, laser.y);
+            self.sprite.set_rotation(laser.degrees);
+            self.sprite.draw(ctx.transform, gl);
+        }
+    }
+}
+
+impl Updateable for Lasers {
+    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         let right_stick_pos = context.get_controller().get_right_stick();
         if right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0 {
             if self.lasers.len() <= 10 && self.last_laser.elapsed().unwrap().as_millis() > 100 {
+                let player_x = context.get_player().x as f64;
+                let player_y = context.get_player().y as f64;
                 let laser = Laser::new(
-                    right_stick_pos.get_degrees(), context.get_player_x(), context.get_player_y(),
-                    context.get_player_x() + (right_stick_pos.get_screen_x() - (self.window_width / 2.0)),
-                    context.get_player_y() + (right_stick_pos.get_screen_y() - (self.window_height / 2.0)),
+                    right_stick_pos.get_degrees(), player_x, player_y,
+                    player_x + (right_stick_pos.get_screen_x() - (self.window_width / 2.0)),
+                    player_y + (right_stick_pos.get_screen_y() - (self.window_height / 2.0)),
                     self.sprite_width, self.sprite_height
                 );
                 self.lasers.insert(laser.id, laser);
@@ -148,15 +166,7 @@ impl Lasers {
         context
     }
 
-    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
-        for laser in self.lasers.values() {
-            self.sprite.set_position(laser.x, laser.y);
-            self.sprite.set_rotation(laser.degrees);
-            self.sprite.draw(ctx.transform, gl);
-        }
-    }
-
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.lasers.clear();
     }
 }
