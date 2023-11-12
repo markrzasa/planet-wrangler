@@ -59,7 +59,7 @@ fn new_rect(sprite_width: u32, sprite_height: u32, window_width: f64, window_hei
     let x = rng.gen_range(0, window_width as u32);
     let y = rng.gen_range(0, window_height as u32);
 
-    return Rect::new(x as i32, y as i32, sprite_width, sprite_height);
+    Rect::new(x as i32, y as i32, sprite_width, sprite_height)
 }
 
 fn get_spawn_points(sprite_width: u32, sprite_height: u32, window_width: f64, window_height: f64, no_spawn_rect: Rect, num_points: u32) -> Vec<Rect> {
@@ -133,27 +133,22 @@ fn main() {
         if let Some(args) = event.controller_axis_args() {
             controller.update(args);
         }
-        if let Some(button) = event.release_args() {
-            match button {
-                Button::Controller(_) => {
-                    if state == GameState::Over {
-                        lives = 3;
-                        num_spawn_points = 3;
-                        score = 0;
-                    } else if state == GameState::LevelComplete {
-                        num_spawn_points = num_spawn_points + 1;
-                    }
-
-                    player.reset();
-                    for (_, planet) in planets.get_planets().iter_mut() {
-                        if planet.get_state() == PlanetState::Towed {
-                            planet.not_towed();
-                        }
-                    }
-                    state = GameState::Running;
-                },
-                _ => {},
+        if let Some(Button::Controller(_)) = event.release_args() {
+            if state == GameState::Over {
+                lives = 3;
+                num_spawn_points = 3;
+                score = 0;
+            } else if state == GameState::LevelComplete {
+                num_spawn_points += 1;
             }
+
+            player.reset();
+            for (_, planet) in planets.get_planets().iter_mut() {
+                if planet.get_state() == PlanetState::Towed {
+                    planet.not_towed();
+                }
+            }
+            state = GameState::Running;
         }
 
         match state {
@@ -210,7 +205,7 @@ fn main() {
                     let er = e.get_sprite().get_position();
                     if er.has_intersection(pr) {
                         enemies_to_remove.push( *ei);
-                        lives = lives - 1;
+                        lives -= 1;
                         if lives == 0 {
                             state = GameState::Over;
                         } else {
@@ -231,11 +226,9 @@ fn main() {
 
                 if player.get_state() == PlayerState::NotTowing {
                     for (_, planet) in planets.get_planets().iter_mut() {
-                        if planet.get_state() == PlanetState::NotTowed {
-                            if planet.get_sprite().get_position().has_intersection(pr) {
-                                player.towing();
-                                planet.towed();
-                            }
+                        if (planet.get_state() == PlanetState::NotTowed) && (planet.get_sprite().get_position().has_intersection(pr)) {
+                            player.towing();
+                            planet.towed();
                         }
                     }
                 }
@@ -243,13 +236,11 @@ fn main() {
                 for (_, planet) in planets.get_planets().iter_mut() {
                     if planet.get_state() == PlanetState::Towed {
                         for black_hole in black_holes.get_black_holes().iter_mut() {
-                            if black_hole.get_state() == BlackHoleState::Open {
-                                if black_hole.get_sprite().get_position().has_intersection(planet.get_sprite().get_position()) {
-                                    black_hole.covered();
-                                    planet.in_place(black_hole.get_sprite().get_position());
-                                    player.not_towing();
-                                    (score, high_score) = update_score(score, high_score, 100);
-                                }
+                            if (black_hole.get_state() == BlackHoleState::Open) && (black_hole.get_sprite().get_position().has_intersection(planet.get_sprite().get_position())) {
+                                black_hole.covered();
+                                planet.in_place(black_hole.get_sprite().get_position());
+                                player.not_towing();
+                                (score, high_score) = update_score(score, high_score, 100);
                             }
                         }
                     }

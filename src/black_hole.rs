@@ -66,7 +66,7 @@ impl BlackHoles {
         &mut self.black_holes
     }
 
-    pub fn set_black_holes(&mut self, black_holes: &Vec<Rect>) {
+    pub fn set_black_holes(&mut self, black_holes: &[Rect]) {
         for rect in black_holes.iter() {
             self.black_holes.push(BlackHole::new(rect))
         }

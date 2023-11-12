@@ -53,12 +53,12 @@ impl Laser {
 
     pub fn update(&mut self) {
         if self.vertical {
-            self.sprite.y = self.sprite.y + self.y_increment;
+            self.sprite.y += self.y_increment;
             if self.m.abs() != f64::INFINITY {
                 self.sprite.x = (self.sprite.y - self.b) / self.m;
             }
         } else {
-            self.sprite.x = self.sprite.x + self.x_increment;
+            self.sprite.x += self.x_increment;
             self.sprite.y = (self.m * self.sprite.x) + self.b;
         }
     }
@@ -125,19 +125,17 @@ impl Drawable for Lasers {
 impl Updateable for Lasers {
     fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         let right_stick_pos = context.get_controller().get_right_stick();
-        if right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0 {
-            if self.lasers.len() <= 10 && self.last_laser.elapsed().unwrap().as_millis() > 100 {
-                let player_x = context.get_player().x as f64;
-                let player_y = context.get_player().y as f64;
-                let laser = Laser::new(
-                    right_stick_pos.get_degrees(), player_x, player_y,
-                    player_x + (right_stick_pos.get_screen_x() - (self.window_width / 2.0)),
-                    player_y + (right_stick_pos.get_screen_y() - (self.window_height / 2.0)),
-                    self.sprite_width, self.sprite_height
-                );
-                self.lasers.insert(laser.sprite.get_id(), laser);
-                self.last_laser = SystemTime::now();
-            }
+        if (right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0) && (self.lasers.len() <= 10 && self.last_laser.elapsed().unwrap().as_millis() > 100) {
+            let player_x = context.get_player().x as f64;
+            let player_y = context.get_player().y as f64;
+            let laser = Laser::new(
+                right_stick_pos.get_degrees(), player_x, player_y,
+                player_x + (right_stick_pos.get_screen_x() - (self.window_width / 2.0)),
+                player_y + (right_stick_pos.get_screen_y() - (self.window_height / 2.0)),
+                self.sprite_width, self.sprite_height
+            );
+            self.lasers.insert(laser.sprite.get_id(), laser);
+            self.last_laser = SystemTime::now();
         }
 
         let mut to_remove = vec!();

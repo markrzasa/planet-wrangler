@@ -110,7 +110,7 @@ impl Planets {
         let x = rng.gen_range(0, self.window_width as u32);
         let y = rng.gen_range(0, self.window_height as u32);
 
-        return Rect::new(x as i32, y as i32, x + self.sprite_width, y + self.sprite_height);
+        Rect::new(x as i32, y as i32, x + self.sprite_width, y + self.sprite_height)
     }
 }
 

@@ -70,22 +70,22 @@ impl Enemy {
                     self.last_frame_change = SystemTime::now();
                 }
                 if (player.x as f64) < self.sprite.x {
-                    self.sprite.x = self.sprite.x - ENEMY_MOVE_INCREMENT;
+                    self.sprite.x -= ENEMY_MOVE_INCREMENT;
                 } else {
-                    self.sprite.x = self.sprite.x + ENEMY_MOVE_INCREMENT;
+                    self.sprite.x += ENEMY_MOVE_INCREMENT;
                 }
 
                 if (player.y as f64) < self.sprite.y {
-                    self.sprite.y = self.sprite.y - ENEMY_MOVE_INCREMENT;
+                    self.sprite.y -= ENEMY_MOVE_INCREMENT;
                 } else {
-                    self.sprite.y = self.sprite.y + ENEMY_MOVE_INCREMENT;
+                    self.sprite.y += ENEMY_MOVE_INCREMENT;
                 }
             }
             EnemyState::Dying => {
-                self.sprite.x = self.sprite.x - ENEMY_DIE_INCREMENT as f64;
-                self.sprite.y = self.sprite.y - ENEMY_DIE_INCREMENT as f64;
-                self.sprite.width = self.sprite.width + (ENEMY_DIE_INCREMENT * 2) as f64;
-                self.sprite.height = self.sprite.height + (ENEMY_DIE_INCREMENT * 2) as f64;
+                self.sprite.x -= ENEMY_DIE_INCREMENT as f64;
+                self.sprite.y -= ENEMY_DIE_INCREMENT as f64;
+                self.sprite.width += (ENEMY_DIE_INCREMENT * 2) as f64;
+                self.sprite.height += (ENEMY_DIE_INCREMENT * 2) as f64;
                 if (self.sprite.x <= 0.0) && (self.sprite.y <= 0.0) && ((self.sprite.x + self.sprite.width) >= screen_width) && ((self.sprite.y + self.sprite.height) >= screen_height) {
                     self.state = EnemyState::Dead;
                 }
