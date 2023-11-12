@@ -7,10 +7,8 @@ use std::rc::Rc;
 use std::time::SystemTime;
 use rust_embed::EmbeddedFile;
 use uuid::Uuid;
-use crate::drawable::Drawable;
 use crate::game_context::GameContext;
 use crate::game_sprite::GameSprite;
-use crate::updateable::Updateable;
 
 pub struct Laser {
     m: f64,
@@ -110,20 +108,16 @@ impl Lasers {
     pub fn remove(&mut self, id: &Uuid) {
         self.lasers.remove(id);
     }
-}
 
-impl Drawable for Lasers {
-    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         for laser in self.lasers.values() {
             self.sprite.set_position(laser.sprite.x, laser.sprite.y);
             self.sprite.set_rotation(laser.sprite.degrees);
             self.sprite.draw(ctx.transform, gl);
         }
     }
-}
 
-impl Updateable for Lasers {
-    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         let right_stick_pos = context.get_controller().get_right_stick();
         if (right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0) && (self.lasers.len() <= 10 && self.last_laser.elapsed().unwrap().as_millis() > 100) {
             let player_x = context.get_player().x as f64;
@@ -153,7 +147,7 @@ impl Updateable for Lasers {
         context
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.lasers.clear();
     }
 }

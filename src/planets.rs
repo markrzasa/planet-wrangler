@@ -8,10 +8,8 @@ use std::rc::Rc;
 use rand::Rng;
 use sdl2::rect::Rect;
 use uuid::Uuid;
-use crate::drawable::Drawable;
 use crate::game_context::GameContext;
 use crate::game_sprite::GameSprite;
-use crate::updateable::Updateable;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlanetState {
@@ -112,10 +110,8 @@ impl Planets {
 
         Rect::new(x as i32, y as i32, x + self.sprite_width, y + self.sprite_height)
     }
-}
 
-impl Drawable for Planets {
-    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         for planet in self.planets.values_mut() {
             self.planet_sprite.set_src_rect([
                 self.sprite_width as f64 * planet.sprite_index as f64,
@@ -130,10 +126,8 @@ impl Drawable for Planets {
             }
         }
     }
-}
 
-impl Updateable for Planets {
-    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         if self.planets.is_empty() {
             let num_planets = context.get_spawn_points().len();
             for i in 0..num_planets {
@@ -164,7 +158,7 @@ impl Updateable for Planets {
         context
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.planets.clear();
     }
 }

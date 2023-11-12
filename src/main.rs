@@ -2,8 +2,6 @@ mod controller;
 mod laser;
 mod player;
 mod enemy;
-mod drawable;
-mod updateable;
 mod black_hole;
 mod game_context;
 mod planets;
@@ -29,13 +27,11 @@ use sdl2_window::Sdl2Window;
 use uuid::Uuid;
 use crate::black_hole::{BlackHole, BlackHoles, BlackHoleState};
 use crate::controller::Controller;
-use crate::drawable::Drawable;
 use crate::enemy::{Enemies, EnemyState};
 use crate::game_context::GameContext;
 use crate::laser::Lasers;
 use crate::planets::{Planets, PlanetState};
 use crate::player::{Player, PlayerState};
-use crate::updateable::Updateable;
 
 const SCORE_HEIGHT: f64 = 20.0;
 const WINDOW_HEIGHT: f64 = 1000.0;
@@ -133,35 +129,39 @@ fn main() {
         if let Some(args) = event.controller_axis_args() {
             controller.update(args);
         }
-        if let Some(Button::Controller(_)) = event.release_args() {
-            if state == GameState::Over {
-                lives = 3;
-                num_spawn_points = 3;
-                score = 0;
-            } else if state == GameState::LevelComplete {
-                num_spawn_points += 1;
-            }
 
-            player.reset();
-            for (_, planet) in planets.get_planets().iter_mut() {
-                if planet.get_state() == PlanetState::Towed {
-                    planet.not_towed();
+        if let Some(Button::Controller(_)) = event.release_args() {
+            if state != GameState::Running {
+                if state == GameState::Over {
+                    lives = 3;
+                    num_spawn_points = 3;
+                    score = 0;
+                } else if state == GameState::LevelComplete {
+                    num_spawn_points += 1;
                 }
+
+                player.reset();
+                for (_, planet) in planets.get_planets().iter_mut() {
+                    if planet.get_state() == PlanetState::Towed {
+                        planet.not_towed();
+                    }
+                }
+                state = GameState::Running;
             }
-            state = GameState::Running;
         }
 
         match state {
             GameState::Starting | GameState::Over | GameState::LevelComplete => {
-                spawn_points.clear();
                 black_holes.reset();
-                planets.reset();
                 enemies.reset();
                 lasers.reset();
+                planets.reset();
                 player.reset();
+                spawn_points.clear();
             }
             GameState::Dead => {
                 enemies.reset();
+                lasers.reset();
             }
             GameState::Running => {
                 if spawn_points.is_empty() {
@@ -229,6 +229,7 @@ fn main() {
                         if (planet.get_state() == PlanetState::NotTowed) && (planet.get_sprite().get_position().has_intersection(pr)) {
                             player.towing();
                             planet.towed();
+                            break;
                         }
                     }
                 }
@@ -241,6 +242,7 @@ fn main() {
                                 planet.in_place(black_hole.get_sprite().get_position());
                                 player.not_towing();
                                 (score, high_score) = update_score(score, high_score, 100);
+                                break;
                             }
                         }
                     }

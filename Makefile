@@ -5,3 +5,9 @@ install-clippy:
 
 lint:
 	cargo clippy
+
+build: lint
+	cargo build
+
+run: lint
+	cargo run

@@ -9,10 +9,8 @@ use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
 use sprite::Sprite;
 use uuid::Uuid;
-use crate::drawable::Drawable;
 use crate::game_context::GameContext;
 use crate::game_sprite::GameSprite;
-use crate::updateable::Updateable;
 
 const ENEMY_MOVE_INCREMENT: f64 = 0.25;
 const ENEMY_DIE_INCREMENT: u32 = 1;
@@ -137,10 +135,8 @@ impl Enemies {
     pub fn remove(&mut self, id: &Uuid) {
         self.enemies.remove(id);
     }
-}
 
-impl Drawable for Enemies {
-    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         for enemy in self.enemies.values_mut() {
             match enemy.get_state() {
                 EnemyState::Alive => {
@@ -159,10 +155,8 @@ impl Drawable for Enemies {
             }
         }
     }
-}
 
-impl Updateable for Enemies {
-    fn update<'s>(&mut self, context: &'s GameContext) -> &'s GameContext {
+    pub fn update<'s>(&mut self, context: &'s GameContext) -> &'s GameContext {
         match self.state {
             EnemiesState::Running => {
                 for (_, e) in self.enemies.iter_mut() {
@@ -197,7 +191,7 @@ impl Updateable for Enemies {
         context
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.enemies.clear();
         self.state = EnemiesState::WaitingForSpawnPoints;
     }

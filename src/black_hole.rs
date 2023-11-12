@@ -6,10 +6,8 @@ use sprite::Sprite;
 use std::rc::Rc;
 use std::time::{Duration, SystemTime};
 use sdl2::rect::Rect;
-use crate::drawable::Drawable;
 use crate::game_context::GameContext;
 use crate::game_sprite::GameSprite;
-use crate::updateable::Updateable;
 
 const ROTATION_UPDATE_MILLIS: Duration = Duration::from_millis(250);
 
@@ -71,20 +69,16 @@ impl BlackHoles {
             self.black_holes.push(BlackHole::new(rect))
         }
     }
-}
 
-impl Drawable for BlackHoles {
-    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         for black_hole in self.black_holes.iter() {
             self.sprite.set_position(black_hole.sprite.x, black_hole.sprite.y);
             self.sprite.set_rotation(black_hole.sprite.degrees);
             self.sprite.draw(ctx.transform, gl);
         }
     }
-}
 
-impl Updateable for BlackHoles {
-    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         for black_hole in self.black_holes.iter_mut() {
             if black_hole.last_update.elapsed().unwrap() > ROTATION_UPDATE_MILLIS {
                 black_hole.sprite.degrees = (black_hole.sprite.degrees + 10.0).rem_euclid(360.0);
@@ -95,7 +89,7 @@ impl Updateable for BlackHoles {
         context
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.black_holes.clear();
     }
 }

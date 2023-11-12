@@ -14,10 +14,8 @@ use sprite::Sprite;
 use std::rc::Rc;
 use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
-use crate::drawable::Drawable;
 use crate::game_context::GameContext;
 use crate::game_sprite::GameSprite;
-use crate::updateable::Updateable;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum PlayerState {
@@ -73,16 +71,12 @@ impl Player {
     pub fn towing(&mut self) {
         self.state = PlayerState::Towing;
     }
-}
 
-impl Drawable for Player {
-    fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
+    pub fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         self.sprite.draw(&mut self.sprite_texture, ctx, gl);
     }
-}
 
-impl Updateable for Player {
-    fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
         let left_stick_pos = context.get_controller().get_left_stick();
         self.sprite.degrees = left_stick_pos.get_degrees() + 90.0;
         self.sprite.set_position(
@@ -93,7 +87,7 @@ impl Updateable for Player {
         context
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.sprite.set_position(self.start_x, self.start_y);
         self.state = PlayerState::NotTowing;
     }
