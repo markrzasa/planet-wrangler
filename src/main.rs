@@ -7,6 +7,7 @@ mod updateable;
 mod black_hole;
 mod game_context;
 mod planets;
+mod game_sprite;
 
 extern crate graphics;
 extern crate image;
@@ -117,10 +118,11 @@ fn main() {
     let mut score = 0;
     let mut high_score = 0;
 
-    let x = (player.get_x() - player.get_width()) as i32;
-    let y = (player.get_y() - player.get_height()) as i32;
-    let w = (player.get_x() + player.get_width()) as u32;
-    let h = (player.get_y() + player.get_height()) as u32;
+    let player_sprite = player.get_sprite();
+    let x = (player_sprite.x - player_sprite.width) as i32;
+    let y = (player_sprite.y - player_sprite.height) as i32;
+    let w = (player_sprite.x + player_sprite.width) as u32;
+    let h = (player_sprite.y + player_sprite.height) as u32;
 
     let no_spawn_rect = Rect::new(x, y, w, h);
     let mut num_spawn_points = 3;
@@ -169,7 +171,7 @@ fn main() {
             GameState::Running => {
                 if spawn_points.is_empty() {
                     spawn_points = get_spawn_points(
-                        player.get_width() as u32, player.get_height() as u32,
+                        player.get_sprite().width as u32, player.get_sprite().height as u32,
                         window_width, game_height,
                         no_spawn_rect, num_spawn_points
                     );
@@ -181,7 +183,9 @@ fn main() {
                     &mut player,
                     game_height,
                     window_width,
-                    black_holes.get_black_holes().iter().filter(|h|h.get_state() == BlackHoleState::Open).map(|h|h.get_rect()).collect()
+                    black_holes.get_black_holes().iter()
+                        .filter(|h|h.get_state() == BlackHoleState::Open)
+                        .map(|h|h.get_sprite().get_position()).collect()
                 );
 
                 game_context = black_holes.update(game_context);
@@ -203,7 +207,7 @@ fn main() {
                         continue;
                     }
 
-                    let er = e.get_rect();
+                    let er = e.get_sprite().get_position();
                     if er.has_intersection(pr) {
                         enemies_to_remove.push( *ei);
                         lives = lives - 1;
@@ -216,7 +220,7 @@ fn main() {
                     }
 
                     for (li, l) in lasers.get_lasers().iter() {
-                        let lr = l.get_rect();
+                        let lr = l.get_sprite().get_position();
                         if lr.has_intersection(er) {
                             e.dying();
                             lasers_to_remove.push( * li);
@@ -228,7 +232,7 @@ fn main() {
                 if player.get_state() == PlayerState::NotTowing {
                     for (_, planet) in planets.get_planets().iter_mut() {
                         if planet.get_state() == PlanetState::NotTowed {
-                            if planet.get_rect().has_intersection(pr) {
+                            if planet.get_sprite().get_position().has_intersection(pr) {
                                 player.towing();
                                 planet.towed();
                             }
@@ -240,9 +244,9 @@ fn main() {
                     if planet.get_state() == PlanetState::Towed {
                         for black_hole in black_holes.get_black_holes().iter_mut() {
                             if black_hole.get_state() == BlackHoleState::Open {
-                                if black_hole.get_rect().has_intersection(planet.get_rect()) {
+                                if black_hole.get_sprite().get_position().has_intersection(planet.get_sprite().get_position()) {
                                     black_hole.covered();
-                                    planet.in_place(black_hole.get_rect());
+                                    planet.in_place(black_hole.get_sprite().get_position());
                                     player.not_towing();
                                     (score, high_score) = update_score(score, high_score, 100);
                                 }

@@ -6,24 +6,19 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::SystemTime;
 use rust_embed::EmbeddedFile;
-use sdl2::rect::Rect;
 use uuid::Uuid;
 use crate::drawable::Drawable;
 use crate::game_context::GameContext;
+use crate::game_sprite::GameSprite;
 use crate::updateable::Updateable;
 
 pub struct Laser {
-    id: Uuid,
-    degrees: f64,
-    x: f64,
-    y: f64,
     m: f64,
     b: f64,
     x_increment: f64,
     y_increment: f64,
     vertical: bool,
-    height: u32,
-    width: u32
+    sprite: GameSprite
 }
 
 impl Laser {
@@ -39,47 +34,41 @@ impl Laser {
             y_increment = 1.0;
         }
 
+        let mut sprite = GameSprite::new(x1, y1, width as f64, height as f64);
+        sprite.degrees = degrees + 90.0;
+
         Self {
-            id: Uuid::new_v4(),
-            degrees: degrees + 90.0,
-            x: x1,
-            y: y1,
             m,
             b: y1 - (m * x1),
             x_increment,
             y_increment,
             vertical: (x2 - x1).abs() < (y2 - y1).abs(),
-            height,
-            width
+            sprite
         }
     }
 
-    pub fn get_id(&self) -> Uuid {
-        return self.id;
-    }
-
-    pub fn get_rect(&self) -> Rect {
-        Rect::new(self.x as i32, self.y as i32, self.width, self.height)
+    pub fn get_sprite(&self) -> GameSprite {
+        self.sprite
     }
 
     pub fn update(&mut self) {
         if self.vertical {
-            self.y = self.y + self.y_increment;
+            self.sprite.y = self.sprite.y + self.y_increment;
             if self.m.abs() != f64::INFINITY {
-                self.x = (self.y - self.b) / self.m;
+                self.sprite.x = (self.sprite.y - self.b) / self.m;
             }
         } else {
-            self.x = self.x + self.x_increment;
-            self.y = (self.m * self.x) + self.b;
+            self.sprite.x = self.sprite.x + self.x_increment;
+            self.sprite.y = (self.m * self.sprite.x) + self.b;
         }
     }
 
     pub fn is_off_screen(&self, window_width: f64, window_height: f64) -> bool {
-        if self.x < 0.0 || self.x > window_width {
+        if self.sprite.x < 0.0 || self.sprite.x > window_width {
             return true;
         }
 
-        if self.y < 0.0 || self.y > window_height {
+        if self.sprite.y < 0.0 || self.sprite.y > window_height {
             return true;
         }
 
@@ -126,8 +115,8 @@ impl Lasers {
 impl Drawable for Lasers {
     fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
         for laser in self.lasers.values() {
-            self.sprite.set_position(laser.x, laser.y);
-            self.sprite.set_rotation(laser.degrees);
+            self.sprite.set_position(laser.sprite.x, laser.sprite.y);
+            self.sprite.set_rotation(laser.sprite.degrees);
             self.sprite.draw(ctx.transform, gl);
         }
     }
@@ -146,7 +135,7 @@ impl Updateable for Lasers {
                     player_y + (right_stick_pos.get_screen_y() - (self.window_height / 2.0)),
                     self.sprite_width, self.sprite_height
                 );
-                self.lasers.insert(laser.id, laser);
+                self.lasers.insert(laser.sprite.get_id(), laser);
                 self.last_laser = SystemTime::now();
             }
         }
@@ -154,7 +143,7 @@ impl Updateable for Lasers {
         let mut to_remove = vec!();
         for laser in self.lasers.values_mut() {
             if laser.is_off_screen(self.window_width, self.window_height) {
-                to_remove.push(laser.get_id());
+                to_remove.push(laser.sprite.get_id());
             } else {
                 laser.update();
             }

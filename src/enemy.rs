@@ -11,6 +11,7 @@ use sprite::Sprite;
 use uuid::Uuid;
 use crate::drawable::Drawable;
 use crate::game_context::GameContext;
+use crate::game_sprite::GameSprite;
 use crate::updateable::Updateable;
 
 const ENEMY_MOVE_INCREMENT: f64 = 0.25;
@@ -27,11 +28,7 @@ pub enum EnemyState {
 }
 
 pub struct Enemy {
-    id: Uuid,
-    x: f64,
-    y: f64,
-    height: u32,
-    width: u32,
+    sprite: GameSprite,
     sprite_index: u32,
     state: EnemyState,
     frames: u32,
@@ -41,11 +38,7 @@ pub struct Enemy {
 impl Enemy {
     pub fn new(x: f64, y: f64, width: u32, height: u32, frames: u32) -> Self {
         Self {
-            id: Uuid::new_v4(),
-            x,
-            y,
-            height,
-            width,
+            sprite: GameSprite::new(x, y, width as f64, height as f64),
             sprite_index: 0,
             state: EnemyState::Alive,
             frames,
@@ -57,12 +50,8 @@ impl Enemy {
         self.state = EnemyState::Dying;
     }
 
-    pub fn get_id(&self) -> Uuid {
-        return self.id;
-    }
-
-    pub fn get_rect(&self) -> Rect {
-        Rect::new(self.x as i32, self.y as i32, self.width, self.height)
+    pub fn get_sprite(&self) -> GameSprite {
+        self.sprite
     }
 
     pub fn get_sprite_index(&self) -> u32 {
@@ -80,24 +69,24 @@ impl Enemy {
                     self.sprite_index = (self.sprite_index + 1).rem_euclid(self.frames);
                     self.last_frame_change = SystemTime::now();
                 }
-                if (player.x as f64) < self.x {
-                    self.x = self.x - ENEMY_MOVE_INCREMENT;
+                if (player.x as f64) < self.sprite.x {
+                    self.sprite.x = self.sprite.x - ENEMY_MOVE_INCREMENT;
                 } else {
-                    self.x = self.x + ENEMY_MOVE_INCREMENT;
+                    self.sprite.x = self.sprite.x + ENEMY_MOVE_INCREMENT;
                 }
 
-                if (player.y as f64) < self.y {
-                    self.y = self.y - ENEMY_MOVE_INCREMENT;
+                if (player.y as f64) < self.sprite.y {
+                    self.sprite.y = self.sprite.y - ENEMY_MOVE_INCREMENT;
                 } else {
-                    self.y = self.y + ENEMY_MOVE_INCREMENT;
+                    self.sprite.y = self.sprite.y + ENEMY_MOVE_INCREMENT;
                 }
             }
             EnemyState::Dying => {
-                self.x = self.x - ENEMY_DIE_INCREMENT as f64;
-                self.y = self.y - ENEMY_DIE_INCREMENT as f64;
-                self.width = self.width + (ENEMY_DIE_INCREMENT * 2);
-                self.height = self.height + (ENEMY_DIE_INCREMENT * 2);
-                if (self.x <= 0.0) && (self.y <= 0.0) && ((self.x + self.width as f64) >= screen_width) && ((self.y + self.height as f64) >= screen_height) {
+                self.sprite.x = self.sprite.x - ENEMY_DIE_INCREMENT as f64;
+                self.sprite.y = self.sprite.y - ENEMY_DIE_INCREMENT as f64;
+                self.sprite.width = self.sprite.width + (ENEMY_DIE_INCREMENT * 2) as f64;
+                self.sprite.height = self.sprite.height + (ENEMY_DIE_INCREMENT * 2) as f64;
+                if (self.sprite.x <= 0.0) && (self.sprite.y <= 0.0) && ((self.sprite.x + self.sprite.width) >= screen_width) && ((self.sprite.y + self.sprite.height) >= screen_height) {
                     self.state = EnemyState::Dead;
                 }
             }
@@ -152,7 +141,7 @@ impl Enemies {
 
 impl Drawable for Enemies {
     fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
-        for enemy in self.enemies.values() {
+        for enemy in self.enemies.values_mut() {
             match enemy.get_state() {
                 EnemyState::Alive => {
                     self.sprite.set_src_rect([
@@ -161,27 +150,10 @@ impl Drawable for Enemies {
                         self.sprite_width as f64,
                         self.sprite_height as f64
                     ]);
-                    self.sprite.set_position(enemy.x, enemy.y);
-                    self.sprite.draw(ctx.transform, gl);
+                    enemy.sprite.draw(&mut self.sprite, ctx, gl);
                 }
                 EnemyState::Dying => {
-                    let width = self.sprite_width as f64 / 2.0;
-                    let height = self.sprite_height as f64 / 2.0;
-                    self.sprite.set_src_rect([0.0, 0.0, width, height]);
-                    self.sprite.set_position(enemy.x, enemy.y);
-                    self.sprite.draw(ctx.transform, gl);
-
-                    self.sprite.set_src_rect([width, 0.0, width, height]);
-                    self.sprite.set_position(enemy.x + enemy.width as f64 - width, enemy.y);
-                    self.sprite.draw(ctx.transform, gl);
-
-                    self.sprite.set_src_rect([0.0, height, width, height]);
-                    self.sprite.set_position(enemy.x + enemy.width as f64 - width, enemy.y + enemy.height as f64 - height);
-                    self.sprite.draw(ctx.transform, gl);
-
-                    self.sprite.set_src_rect([width, height, width, height]);
-                    self.sprite.set_position(enemy.x, enemy.y + enemy.height as f64 - height);
-                    self.sprite.draw(ctx.transform, gl);
+                    enemy.sprite.shatter(&mut self.sprite, self.sprite_width, self.sprite_height, ctx, gl);
                 }
                 _ => {}
             }
@@ -205,7 +177,7 @@ impl Updateable for Enemies {
                         p.x as f64, p.y as f64,
                         self.sprite_width, self.sprite_height, self.sprite_frames
                     );
-                    self.enemies.insert(enemy.get_id(), enemy);
+                    self.enemies.insert(enemy.get_sprite().get_id(), enemy);
                     self.last_enemy = SystemTime::now();
                 }
             }

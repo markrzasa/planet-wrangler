@@ -10,6 +10,7 @@ use sdl2::rect::Rect;
 use uuid::Uuid;
 use crate::drawable::Drawable;
 use crate::game_context::GameContext;
+use crate::game_sprite::GameSprite;
 use crate::updateable::Updateable;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -20,30 +21,22 @@ pub enum PlanetState {
 }
 
 pub struct Planet {
-    height: u32,
-    id: Uuid,
+    sprite: GameSprite,
     sprite_index: u32,
     state: PlanetState,
-    width: u32,
-    x: f64,
-    y: f64
 }
 
 impl Planet {
     pub fn new(x: f64, y: f64, sprite_index: u32, width: u32, height: u32) -> Self {
         Self {
-            height,
-            id: Uuid::new_v4(),
             sprite_index,
-            state: PlanetState::NotTowed,
-            width,
-            x,
-            y
+            sprite: GameSprite::new(x, y, width as f64, height as f64),
+            state: PlanetState::NotTowed
         }
     }
 
-    pub fn get_rect(&self) -> Rect {
-        Rect::new(self.x as i32, self.y as i32, self.width, self.height)
+    pub fn get_sprite(&self) -> GameSprite {
+        self.sprite
     }
 
     pub fn get_state(&self) -> PlanetState {
@@ -52,8 +45,8 @@ impl Planet {
 
     pub fn in_place(&mut self, rect: Rect)
     {
-        self.x = rect.x() as f64;
-        self.y = rect.y() as f64;
+        self.sprite.x = rect.x() as f64;
+        self.sprite.y = rect.y() as f64;
         self.state = PlanetState::InPlace;
     }
 
@@ -67,8 +60,8 @@ impl Planet {
 
     fn update(&mut self, player: Rect) {
         if self.state == PlanetState::Towed {
-            self.x = player.x as f64;
-            self.y = player.y as f64;
+            self.sprite.x = player.x as f64;
+            self.sprite.y = player.y as f64;
         }
     }
 }
@@ -123,17 +116,16 @@ impl Planets {
 
 impl Drawable for Planets {
     fn draw(&mut self, ctx: Context, gl: &mut GlGraphics) {
-        for planet in self.planets.values() {
+        for planet in self.planets.values_mut() {
             self.planet_sprite.set_src_rect([
                 self.sprite_width as f64 * planet.sprite_index as f64,
                 0.0,
                 self.sprite_width as f64,
                 self.sprite_height as f64
             ]);
-            self.planet_sprite.set_position(planet.x, planet.y);
-            self.planet_sprite.draw(ctx.transform, gl);
+            planet.sprite.draw(&mut self.planet_sprite, ctx, gl);
             if planet.get_state() == PlanetState::InPlace {
-                self.done_sprite.set_position(planet.x, planet.y);
+                self.done_sprite.set_position(planet.sprite.x, planet.sprite.y);
                 self.done_sprite.draw(ctx.transform, gl);
             }
         }
@@ -161,7 +153,7 @@ impl Updateable for Planets {
                     r.x as f64, r.y as f64, i.rem_euclid(self.frames as usize) as u32,
                     self.sprite_width, self.sprite_height
                 );
-                self.planets.insert(p.id, p);
+                self.planets.insert(p.sprite.get_id(), p);
             }
         } else {
             for (_, planet) in self.planets.iter_mut() {
