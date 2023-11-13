@@ -3,9 +3,10 @@ mod laser;
 mod player;
 mod enemy;
 mod black_hole;
-mod game_context;
+mod game_elements;
 mod planets;
 mod game_sprite;
+mod game;
 
 extern crate graphics;
 extern crate image;
@@ -20,15 +21,14 @@ use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, ImageSize, Texture};
 use piston::{Button, ControllerAxisEvent, Events, EventSettings, RenderEvent, ReleaseEvent};
 use piston::window::WindowSettings;
 use piston_window::{color, TextureSettings, Window};
-use rand::Rng;
 use rust_embed::RustEmbed;
-use sdl2::rect::Rect;
 use sdl2_window::Sdl2Window;
 use uuid::Uuid;
 use crate::black_hole::{BlackHole, BlackHoles, BlackHoleState};
 use crate::controller::Controller;
 use crate::enemy::{Enemies, EnemyState};
-use crate::game_context::GameContext;
+use crate::game::{Game, GameState};
+use crate::game_elements::GameElements;
 use crate::laser::Lasers;
 use crate::planets::{Planets, PlanetState};
 use crate::player::{Player, PlayerState};
@@ -40,36 +40,6 @@ const WINDOW_WIDTH: f64 = 1000.0;
 #[derive(RustEmbed)]
 #[folder = "assets/"]
 struct Assets;
-
-#[derive(PartialEq)]
-enum GameState {
-    Starting,
-    Running,
-    LevelComplete,
-    Dead,
-    Over
-}
-
-fn new_rect(sprite_width: u32, sprite_height: u32, window_width: f64, window_height: f64) -> Rect {
-    let mut rng = rand::thread_rng();
-    let x = rng.gen_range(0, window_width as u32);
-    let y = rng.gen_range(0, window_height as u32);
-
-    Rect::new(x as i32, y as i32, sprite_width, sprite_height)
-}
-
-fn get_spawn_points(sprite_width: u32, sprite_height: u32, window_width: f64, window_height: f64, no_spawn_rect: Rect, num_points: u32) -> Vec<Rect> {
-    let mut points: Vec<Rect> = Vec::new();
-    for _ in 0..num_points {
-        let mut r = new_rect(sprite_width, sprite_height, window_width, window_height);
-        while r.has_intersection(no_spawn_rect) {
-            r = new_rect(sprite_width, sprite_height, window_width, window_height);
-        }
-        points.push(new_rect(sprite_width, sprite_height, window_width, window_height));
-    }
-
-    points
-}
 
 fn update_score(score: u32, high_score: u32, increment: u32) -> (u32, u32) {
     let new_score = score + increment;
@@ -98,101 +68,98 @@ fn main() {
     let window_height = window.size().height;
     let game_height = window_height - SCORE_HEIGHT - size.1 as f64;
 
-    let mut controller = Controller::new(window_width, window_height);
     let mut glyphs = GlyphCache::from_bytes(font.data.as_ref(), (), TextureSettings::new()).unwrap();
-    let mut lasers = Lasers::new(window_width, game_height, &Assets::get("laser.png").unwrap());
-    let mut player = Player::new(window_width, game_height, &hero_png);
-    let mut enemies = Enemies::new(&Assets::get("enemy.png").unwrap(), 3);
-    let mut black_holes = BlackHoles::new(&Assets::get("black-hole.png").unwrap());
-    let mut planets = Planets::new(
+
+    let mut game_elements = GameElements {
+        black_holes: BlackHoles::new(&Assets::get("black-hole.png").unwrap()),
+        enemies: Enemies::new(&Assets::get("enemy.png").unwrap(), 3),
+        lasers: Lasers::new(window_width, game_height, &Assets::get("laser.png").unwrap()),
+        planets: Planets::new(
         &Assets::get("done.png").unwrap(),
         &Assets::get("planets.png").unwrap(),
         3, window_width, game_height
-    );
-    let mut state = GameState::Starting;
-    let mut lives = 3;
-    let mut score = 0;
-    let mut high_score = 0;
+        ),
+        player: Player::new(window_width, game_height, &hero_png)
+    };
 
-    let player_sprite = player.get_sprite();
-    let x = (player_sprite.x - player_sprite.width) as i32;
-    let y = (player_sprite.y - player_sprite.height) as i32;
-    let w = (player_sprite.x + player_sprite.width) as u32;
-    let h = (player_sprite.y + player_sprite.height) as u32;
-
-    let no_spawn_rect = Rect::new(x, y, w, h);
-    let mut num_spawn_points = 3;
-    let mut spawn_points: Vec<Rect> = Vec::new();
+    let mut game = Game{
+        black_hole_count: 3,
+        black_holes: Vec::new(),
+        controller: Controller::new(window_width, window_height),
+        high_score: 0,
+        lives: 3,
+        player: game_elements.player.get_sprite().get_position(),
+        score: 0,
+        screen_height: game_height,
+        screen_width: window_width,
+        state: GameState::Starting
+    };
 
     let mut events = Events::new(EventSettings::new());
     while let Some(event) = events.next(&mut window) {
         if let Some(args) = event.controller_axis_args() {
-            controller.update(args);
+            game.controller.update(args);
         }
 
         if let Some(Button::Controller(_)) = event.release_args() {
-            if state != GameState::Running {
-                if state == GameState::Over {
-                    lives = 3;
-                    num_spawn_points = 3;
-                    score = 0;
-                } else if state == GameState::LevelComplete {
-                    num_spawn_points += 1;
+            if game.state != GameState::Running {
+                if game.state == GameState::Over {
+                    game.lives = 3;
+                    game.black_hole_count = 3;
+                    game.score = 0;
+                } else if game.state == GameState::LevelComplete {
+                    game.black_hole_count += 1;
                 }
 
-                player.reset();
-                for (_, planet) in planets.get_planets().iter_mut() {
+                game_elements.player.reset();
+                for (_, planet) in game_elements.planets.get_planets().iter_mut() {
                     if planet.get_state() == PlanetState::Towed {
                         planet.not_towed();
                     }
                 }
-                state = GameState::Running;
+                game.state = GameState::Running;
             }
         }
 
-        match state {
+        match game.state {
             GameState::Starting | GameState::Over | GameState::LevelComplete => {
-                black_holes.reset();
-                enemies.reset();
-                lasers.reset();
-                planets.reset();
-                player.reset();
-                spawn_points.clear();
+                game_elements.black_holes.reset();
+                game_elements.enemies.reset();
+                game_elements.lasers.reset();
+                game_elements.planets.reset();
+                game_elements.player.reset();
+            }
+            GameState::Dying => {
+                game_elements.player.update(&game);
+                if game_elements.player.get_state() == PlayerState::Dead {
+                    if game.lives == 0 {
+                        game.state = GameState::Over;
+                    } else {
+                        game.state = GameState::Dead;
+                    }
+                }
             }
             GameState::Dead => {
-                enemies.reset();
-                lasers.reset();
+                game_elements.enemies.reset();
+                game_elements.lasers.reset();
             }
             GameState::Running => {
-                if spawn_points.is_empty() {
-                    spawn_points = get_spawn_points(
-                        player.get_sprite().width as u32, player.get_sprite().height as u32,
-                        window_width, game_height,
-                        no_spawn_rect, num_spawn_points
-                    );
-                    black_holes.set_black_holes(&spawn_points);
-                }
+                game.player = game_elements.player.get_sprite().get_position();
+                game.black_holes = game_elements.black_holes.get_black_holes().iter()
+                    .filter(|h|h.get_state() == BlackHoleState::Open)
+                    .map(|h|h.get_sprite().get_position()).collect();
 
-                let mut game_context = & GameContext::new(
-                    &mut controller,
-                    &mut player,
-                    game_height,
-                    window_width,
-                    black_holes.get_black_holes().iter()
-                        .filter(|h|h.get_state() == BlackHoleState::Open)
-                        .map(|h|h.get_sprite().get_position()).collect()
-                );
+                game_elements.player.update(&game);
+                game_elements.black_holes.update(&game);
+                game_elements.planets.update(&game);
+                game_elements.enemies.update(&game);
+                game_elements.player.update(&game);
+                game_elements.lasers.update(&game);
 
-                game_context = black_holes.update(game_context);
-                game_context = planets.update(game_context);
-                game_context = enemies.update(game_context);
-                game_context = player.update(game_context);
-                lasers.update(game_context);
-
-                let pr = player.get_rect();
+                let pr = game_elements.player.get_sprite().get_position();
                 let mut enemies_to_remove: Vec<Uuid> = vec![];
                 let mut lasers_to_remove: Vec<Uuid> = vec![];
-                for (ei, e) in enemies.get_enemies().iter_mut() {
+                for (ei, e) in game_elements.enemies.get_enemies().iter_mut() {
                     if e.get_state() == EnemyState::Dying {
                         continue;
                     }
@@ -205,43 +172,40 @@ fn main() {
                     let er = e.get_sprite().get_position();
                     if er.has_intersection(pr) {
                         enemies_to_remove.push( *ei);
-                        lives -= 1;
-                        if lives == 0 {
-                            state = GameState::Over;
-                        } else {
-                            state = GameState::Dead;
-                        }
+                        game.lives -= 1;
+                        game_elements.player.dying();
+                        game.state = GameState::Dying;
                         continue;
                     }
 
-                    for (li, l) in lasers.get_lasers().iter() {
+                    for (li, l) in game_elements.lasers.get_lasers().iter() {
                         let lr = l.get_sprite().get_position();
                         if lr.has_intersection(er) {
                             e.dying();
                             lasers_to_remove.push( * li);
-                            (score, high_score) = update_score(score, high_score, 10);
+                            (game.score, game.high_score) = update_score(game.score, game.high_score, 10);
                         }
                     }
                 }
 
-                if player.get_state() == PlayerState::NotTowing {
-                    for (_, planet) in planets.get_planets().iter_mut() {
+                if game_elements.player.get_state() == PlayerState::NotTowing {
+                    for (_, planet) in game_elements.planets.get_planets().iter_mut() {
                         if (planet.get_state() == PlanetState::NotTowed) && (planet.get_sprite().get_position().has_intersection(pr)) {
-                            player.towing();
+                            game_elements.player.towing();
                             planet.towed();
                             break;
                         }
                     }
                 }
 
-                for (_, planet) in planets.get_planets().iter_mut() {
+                for (_, planet) in game_elements.planets.get_planets().iter_mut() {
                     if planet.get_state() == PlanetState::Towed {
-                        for black_hole in black_holes.get_black_holes().iter_mut() {
+                        for black_hole in game_elements.black_holes.get_black_holes().iter_mut() {
                             if (black_hole.get_state() == BlackHoleState::Open) && (black_hole.get_sprite().get_position().has_intersection(planet.get_sprite().get_position())) {
                                 black_hole.covered();
                                 planet.in_place(black_hole.get_sprite().get_position());
-                                player.not_towing();
-                                (score, high_score) = update_score(score, high_score, 100);
+                                game_elements.player.not_towing();
+                                (game.score, game.high_score) = update_score(game.score, game.high_score, 100);
                                 break;
                             }
                         }
@@ -249,17 +213,17 @@ fn main() {
                 }
 
                 for e in enemies_to_remove.iter() {
-                    enemies.remove(e);
+                    game_elements.enemies.remove(e);
                 }
 
                 for l in lasers_to_remove.iter() {
-                    lasers.remove(l);
+                    game_elements.lasers.remove(l);
                 }
 
-                if !black_holes.get_black_holes().is_empty() {
-                    let open_black_holes: Vec<&BlackHole> = black_holes.get_black_holes().iter().filter(|h|h.get_state() == BlackHoleState::Open).collect();
+                if !game_elements.black_holes.get_black_holes().is_empty() {
+                    let open_black_holes: Vec<&BlackHole> = game_elements.black_holes.get_black_holes().iter().filter(|h|h.get_state() == BlackHoleState::Open).collect();
                     if open_black_holes.is_empty() {
-                        state = GameState::LevelComplete;
+                        game.state = GameState::LevelComplete;
                     }
                 }
             }
@@ -271,22 +235,22 @@ fn main() {
                 let y = window_height - 30.0;
                 let mut transform = ctx.transform.trans(48.0, y);
                 text::Text::new_color(color::YELLOW, 24).draw(
-                    &format!("{}", score), &mut glyphs, &ctx.draw_state, transform, gl
+                    &format!("{}", game.score), &mut glyphs, &ctx.draw_state, transform, gl
                 ).unwrap();
 
                 transform = ctx.transform.trans((window_width / 2.0) - (24.0 * 4.0), y);
                 text::Text::new_color(color::YELLOW, 24).draw(
-                    &format!("High: {}", high_score), &mut glyphs, &ctx.draw_state, transform, gl
+                    &format!("High: {}", game.high_score), &mut glyphs, &ctx.draw_state, transform, gl
                 ).unwrap();
 
                 transform = ctx.transform.trans(window_width - 72.0, y);
                 text::Text::new_color(color::YELLOW, 24).draw(
-                    &format!("{}", lives), &mut glyphs, &ctx.draw_state, transform, gl
+                    &format!("{}", game.lives), &mut glyphs, &ctx.draw_state, transform, gl
                 ).unwrap();
 
-                match state {
+                match game.state {
                     GameState::Starting | GameState::Over => {
-                        if state == GameState::Starting {
+                        if game.state == GameState::Starting {
                             let transform = ctx.transform.trans((window_width / 2.0) - 250.0, (game_height / 2.0) - 14.0);
                             text::Text::new_color(color::YELLOW, 14).draw(
                                 "Press a button to start",
@@ -315,11 +279,11 @@ fn main() {
                         ).unwrap();
                     }
                     _ => {
-                        black_holes.draw(ctx, gl);
-                        planets.draw(ctx, gl);
-                        player.draw(ctx, gl);
-                        lasers.draw(ctx, gl);
-                        enemies.draw(ctx, gl);
+                        game_elements.black_holes.draw(ctx, gl);
+                        game_elements.planets.draw(ctx, gl);
+                        game_elements.player.draw(ctx, gl);
+                        game_elements.lasers.draw(ctx, gl);
+                        game_elements.enemies.draw(ctx, gl);
                     }
                 }
             });

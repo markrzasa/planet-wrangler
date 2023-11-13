@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::time::SystemTime;
 use rust_embed::EmbeddedFile;
 use uuid::Uuid;
-use crate::game_context::GameContext;
+use crate::game::Game;
 use crate::game_sprite::GameSprite;
 
 pub struct Laser {
@@ -117,11 +117,11 @@ impl Lasers {
         }
     }
 
-    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
-        let right_stick_pos = context.get_controller().get_right_stick();
+    pub fn update(&mut self, game: &Game) {
+        let right_stick_pos = game.controller.get_right_stick();
         if (right_stick_pos.get_x() != 0.0 || right_stick_pos.get_y() != 0.0) && (self.lasers.len() <= 10 && self.last_laser.elapsed().unwrap().as_millis() > 100) {
-            let player_x = context.get_player().x as f64;
-            let player_y = context.get_player().y as f64;
+            let player_x = game.player.x as f64;
+            let player_y = game.player.y as f64;
             let laser = Laser::new(
                 right_stick_pos.get_degrees(), player_x, player_y,
                 player_x + (right_stick_pos.get_screen_x() - (self.window_width / 2.0)),
@@ -143,8 +143,6 @@ impl Lasers {
         for id in to_remove.iter() {
             self.lasers.remove(id);
         }
-
-        context
     }
 
     pub fn reset(&mut self) {

@@ -8,7 +8,7 @@ use std::rc::Rc;
 use rand::Rng;
 use sdl2::rect::Rect;
 use uuid::Uuid;
-use crate::game_context::GameContext;
+use crate::game::Game;
 use crate::game_sprite::GameSprite;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -127,16 +127,15 @@ impl Planets {
         }
     }
 
-    pub fn update<'a>(&'a mut self, context: &'a GameContext) -> &GameContext {
+    pub fn update(&mut self, game: &Game) {
         if self.planets.is_empty() {
-            let num_planets = context.get_spawn_points().len();
-            for i in 0..num_planets {
+            for i in 0..game.black_hole_count {
                 let mut got_rect = false;
                 let mut r = self.new_rect();
                 while !got_rect {
                     got_rect = true;
-                    for p in context.get_spawn_points().iter() {
-                        if r.has_intersection(*p) {
+                    for h in game.black_holes.iter() {
+                        if r.has_intersection(*h) {
                             got_rect = false;
                             r = self.new_rect();
                             break;
@@ -144,18 +143,16 @@ impl Planets {
                     }
                 }
                 let p = Planet::new(
-                    r.x as f64, r.y as f64, i.rem_euclid(self.frames as usize) as u32,
+                    r.x as f64, r.y as f64, i.rem_euclid(self.frames),
                     self.sprite_width, self.sprite_height
                 );
                 self.planets.insert(p.sprite.get_id(), p);
             }
         } else {
             for (_, planet) in self.planets.iter_mut() {
-                planet.update(context.get_player());
+                planet.update(game.player);
             }
         }
-
-        context
     }
 
     pub fn reset(&mut self) {

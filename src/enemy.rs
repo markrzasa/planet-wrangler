@@ -9,11 +9,11 @@ use rust_embed::EmbeddedFile;
 use sdl2::rect::Rect;
 use sprite::Sprite;
 use uuid::Uuid;
-use crate::game_context::GameContext;
+use crate::game::Game;
 use crate::game_sprite::GameSprite;
 
 const ENEMY_MOVE_INCREMENT: f64 = 0.25;
-const ENEMY_DIE_INCREMENT: u32 = 1;
+const ENEMY_DIE_INCREMENT: f64 = 1.0;
 const FRAME_DURATION_MILLIS: Duration = Duration::from_millis(100);
 const MAX_ENEMIES: usize = 75;
 const WAIT_TO_SPAWN_DURATION: Duration = Duration::from_millis(2000);
@@ -46,6 +46,7 @@ impl Enemy {
 
     pub fn dying(&mut self) {
         self.state = EnemyState::Dying;
+        self.sprite.shatter_start();
     }
 
     pub fn get_sprite(&self) -> GameSprite {
@@ -80,11 +81,7 @@ impl Enemy {
                 }
             }
             EnemyState::Dying => {
-                self.sprite.x -= ENEMY_DIE_INCREMENT as f64;
-                self.sprite.y -= ENEMY_DIE_INCREMENT as f64;
-                self.sprite.width += (ENEMY_DIE_INCREMENT * 2) as f64;
-                self.sprite.height += (ENEMY_DIE_INCREMENT * 2) as f64;
-                if (self.sprite.x <= 0.0) && (self.sprite.y <= 0.0) && ((self.sprite.x + self.sprite.width) >= screen_width) && ((self.sprite.y + self.sprite.height) >= screen_height) {
+                if self.sprite.shatter_update(ENEMY_DIE_INCREMENT, screen_width, screen_height) {
                     self.state = EnemyState::Dead;
                 }
             }
@@ -156,17 +153,16 @@ impl Enemies {
         }
     }
 
-    pub fn update<'s>(&mut self, context: &'s GameContext) -> &'s GameContext {
+    pub fn update(&mut self, game: &Game) {
         match self.state {
             EnemiesState::Running => {
                 for (_, e) in self.enemies.iter_mut() {
-                    e.update(context.get_player(), context.get_screen_height(), context.get_screen_width());
+                    e.update(game.player, game.screen_height, game.screen_width);
                 }
 
                 if self.last_enemy.elapsed().unwrap().as_millis() > 500 && self.enemies.len() < MAX_ENEMIES {
-                    let spawn_points = context.get_spawn_points();
-                    let i = rand::thread_rng().gen_range(0, spawn_points.len());
-                    let p = spawn_points.get(i).unwrap();
+                    let i = rand::thread_rng().gen_range(0, game.black_holes.len());
+                    let p = game.black_holes.get(i).unwrap();
                     let enemy = Enemy::new(
                         p.x as f64, p.y as f64,
                         self.sprite_width, self.sprite_height, self.sprite_frames
@@ -181,14 +177,12 @@ impl Enemies {
                 }
             }
             EnemiesState::WaitingForSpawnPoints => {
-                if !context.get_spawn_points().is_empty() {
+                if !game.black_holes.is_empty() {
                     self.state = EnemiesState::WaitingToSpawn;
                     self.wait_start = SystemTime::now();
                 }
             }
         }
-
-        context
     }
 
     pub fn reset(&mut self) {
